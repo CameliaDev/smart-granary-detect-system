@@ -3,8 +3,6 @@
 
 #include <stddef.h>
 
-#include <linux/input.h> /* KEY_1/KEY_2/KEY_3 等按键码默认值 */
-
 /*
  * 线程槽位（看门狗心跳索引）。
  * 数量须小于 state.h 的 STATE_THREAD_SLOTS。
@@ -51,17 +49,6 @@ enum {
 #endif
 #ifndef WATCHDOG_PERIOD_MS
 #define WATCHDOG_PERIOD_MS 5000U
-#endif
-
-/* 按键码（编译期覆盖：-DGRANARY_KEY1_CODE=...） */
-#ifndef GRANARY_KEY1_CODE
-#define GRANARY_KEY1_CODE KEY_1
-#endif
-#ifndef GRANARY_KEY2_CODE
-#define GRANARY_KEY2_CODE KEY_2
-#endif
-#ifndef GRANARY_KEY3_CODE
-#define GRANARY_KEY3_CODE KEY_3
 #endif
 
 void app_request_stop(void);

@@ -36,7 +36,7 @@ typedef struct {
     unsigned int display_period_ms; /* GRANARY_DISPLAY_PERIOD_MS (默认 2000)  */
     unsigned int alarm_period_ms;   /* GRANARY_ALARM_PERIOD_MS   (默认 50)    */
     /* 网络与存储 */
-    unsigned short http_port;       /* GRANARY_HTTP_PORT (默认 8080) */
+    unsigned short http_port;       /* GRANARY_HTTP_PORT (默认 8081) */
     char snapshot_dir[256];         /* GRANARY_SNAPSHOT_DIR (默认 ./snapshots) */
     int snapshot_keep_days;         /* GRANARY_SNAPSHOT_KEEP_DAYS (默认 7, 0=不清理) */
     int key2_save_snapshot;         /* GRANARY_KEY2_SAVE (默认 0; PDF 定义 KEY2 仅抓拍分析) */

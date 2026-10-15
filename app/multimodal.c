@@ -45,6 +45,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if defined(__GNUC__) || defined(__clang__)
+#define MULTIMODAL_MAYBE_UNUSED __attribute__((unused))
+#else
+#define MULTIMODAL_MAYBE_UNUSED
+#endif
+
 #ifdef HAVE_LIBCURL
 #include <curl/curl.h>
 #endif
@@ -61,6 +67,17 @@ static const char k_default_prompt[] =
 
 /* 流式累积文本上限（防止异常响应耗尽内存；超出部分丢弃） */
 #define AI_TEXT_ACCUM_MAX (64 * 1024)
+
+/*
+ * 内置默认 API Key（全局生效，按项目要求直接写入代码）：
+ *   - 环境变量 MULTIMODAL_API_KEY 优先，未设置时自动使用此内置密钥；
+ *   - 编译期可用 -DMULTIMODAL_API_KEY_DEFAULT="..." 覆盖；
+ *   - 安全提醒：含真实密钥的源码切勿提交到公开仓库或外发。
+ */
+#ifndef MULTIMODAL_API_KEY_DEFAULT
+#define MULTIMODAL_API_KEY_DEFAULT \
+    "ark-73964143-8d3a-4c90-9975-cdcb28e74da7-392cc"
+#endif
 
 /* ---------- Base64 编码 ---------- */
 
@@ -136,6 +153,7 @@ struct text_buf {
     size_t cap;
 };
 
+MULTIMODAL_MAYBE_UNUSED
 static int text_buf_append(struct text_buf *tb, const char *s, size_t n)
 {
     if (tb->len + n > AI_TEXT_ACCUM_MAX) {
@@ -418,6 +436,7 @@ static void apply_stub(app_state_t *st, const char *reason)
  * 与 alarm.c 的 E03/E04/E05 对应：
  *   intrusion → E03；mold/collapse/pest/debris → E04；fire → E05
  */
+MULTIMODAL_MAYBE_UNUSED
 static void parse_ai_flags(app_state_t *st, const char *text)
 {
     char lower[STATE_AI_TEXT_MAX];
@@ -473,6 +492,10 @@ int multimodal_analyze_jpeg(app_state_t *st, const unsigned char *jpeg,
     }
 
     api_key = getenv("MULTIMODAL_API_KEY");
+    /* 未设置环境变量时使用内置默认密钥（全局生效） */
+    if (api_key == NULL || api_key[0] == '\0') {
+        api_key = MULTIMODAL_API_KEY_DEFAULT;
+    }
     /* 提示词：st->cfg（MULTIMODAL_PROMPT）优先，其次内置默认 */
     prompt = (st->cfg.multimodal_prompt[0] != '\0') ? st->cfg.multimodal_prompt
                                                     : k_default_prompt;
@@ -499,7 +522,7 @@ int multimodal_analyze_jpeg(app_state_t *st, const unsigned char *jpeg,
     if (api_key == NULL || api_key[0] == '\0') {
         free(b64);
         free(prompt_esc);
-        apply_stub(st, "no MULTIMODAL_API_KEY");
+        apply_stub(st, "no API key configured");
         return 0;
     }
 

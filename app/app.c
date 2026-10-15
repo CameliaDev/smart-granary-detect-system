@@ -19,6 +19,7 @@
 #include "pir_sensor.h"
 #include "voltage_sensor.h"
 
+#include <errno.h>
 #include <math.h>
 #include <pthread.h>
 #include <signal.h>
@@ -391,6 +392,19 @@ void *app_camera_thread(void *argument)
             }
 
             free(jpeg);
+        } else {
+            /*
+             * 采集失败（摄像头中途掉线 / USB 复位等）：必须关闭失效 fd 并
+             * 清除 cam_ok，回到上面的重连分支。否则会拿着死掉的设备描述符
+             * 每周期重试，错误刷屏且 AI 永远拿不到帧。
+             */
+            log_warn("camera capture failed on %s (%s); reconnecting",
+                     cam.device_path, strerror(errno));
+            camera_close(&cam);
+            memset(&cam, 0, sizeof(cam));
+            cam_ok = 0;
+            delay_ms(CAMERA_RETRY_MS);
+            continue;
         }
 
         ai_acc += camera_ms;
@@ -455,6 +469,15 @@ void *app_ai_thread(void *argument)
             clock_gettime(CLOCK_REALTIME, &ts);
             ts.tv_sec += 1;
             pthread_cond_timedwait(&st->ai_cond, &st->lock, &ts);
+            if (!st->stop && !st->ai_request) {
+                /*
+                 * 空闲等待期间也要喂看门狗：无摄像头/无按键的开发机上
+                 * 可能长时间没有 AI 请求，不更新心跳会被看门狗误判卡死。
+                 */
+                pthread_mutex_unlock(&st->lock);
+                state_heartbeat(APP_THREAD_AI);
+                pthread_mutex_lock(&st->lock);
+            }
         }
         if (st->stop) {
             pthread_mutex_unlock(&st->lock);

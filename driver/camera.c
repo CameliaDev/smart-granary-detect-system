@@ -3,6 +3,7 @@
 
 #include "camera.h"
 
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <linux/videodev2.h>
@@ -369,10 +370,13 @@ static int open_one_device(camera_t *cam, const char *path)
 
 int camera_open(camera_t *cam, const char *device_path)
 {
-    const char *candidates[4];
+    const char *candidates[16];
+    char names[16][32];
     unsigned int n = 0;
     unsigned int i;
     const char *env;
+    DIR *dir;
+    struct dirent *de;
 
     if (cam == NULL) {
         errno = EINVAL;
@@ -386,10 +390,42 @@ int camera_open(camera_t *cam, const char *device_path)
         if (env != NULL && env[0] != '\0') {
             candidates[n++] = env;
         } else {
-            /* video1 = UVC capture on FS-MP1A; video2 = meta; video0 = dcmi */
-            candidates[n++] = "/dev/video1";
-            candidates[n++] = "/dev/video2";
-            candidates[n++] = "/dev/video0";
+            /*
+             * 扫描 /dev/video*：摄像头热插拔/USB 复位后设备节点号会漂移
+             * （实测出现过 video2 → video3），固定探测三个节点会错过。
+             * 只探测真实存在的节点，避免 ENOENT 刷屏。
+             */
+            dir = opendir("/dev");
+            if (dir != NULL) {
+                while ((de = readdir(dir)) != NULL && n < 16) {
+                    if (strncmp(de->d_name, "video", 5) != 0) {
+                        continue;
+                    }
+                    /* 精度限定：video 节点名很短，防止理论上超长文件名截断 */
+                    snprintf(names[n], sizeof(names[n]), "/dev/%.24s",
+                             de->d_name);
+                    candidates[n] = names[n];
+                    n++;
+                }
+                closedir(dir);
+                /* 按名称排序，保证探测顺序确定（video0, video1, ...） */
+                for (i = 0; i + 1 < n; i++) {
+                    unsigned int j;
+                    for (j = i + 1; j < n; j++) {
+                        if (strcmp(candidates[i], candidates[j]) > 0) {
+                            const char *tmp = candidates[i];
+                            candidates[i] = candidates[j];
+                            candidates[j] = tmp;
+                        }
+                    }
+                }
+            }
+            if (n == 0) {
+                /* 扫描失败时退回默认顺序 */
+                candidates[n++] = "/dev/video1";
+                candidates[n++] = "/dev/video2";
+                candidates[n++] = "/dev/video0";
+            }
         }
     }
 

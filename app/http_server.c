@@ -9,7 +9,7 @@
  *   GET /snapshot.jpg?name=<YYYY-MM-DD/snap_*.jpg>  读取单张快照
  *   GET /control?action=pause|resume|toggle|mute    巡检/静音控制
  *
- * 端口：GRANARY_HTTP_PORT（默认 8080），运行期生效。
+ * 端口：GRANARY_HTTP_PORT（默认 8081），运行期生效。
  * 每客户端独立线程，套接字带收发超时，避免慢速连接拖死服务。
  */
 

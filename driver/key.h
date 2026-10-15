@@ -1,7 +1,20 @@
-#ifndef KEY_H
-#define KEY_H
+#ifndef GRANARY_DRIVER_KEY_H
+#define GRANARY_DRIVER_KEY_H
 
 #include <stdint.h>
+
+#include <linux/input.h> /* KEY_1/KEY_2/KEY_3 等按键码默认值 */
+
+/* 按键码（编译期覆盖：-DGRANARY_KEY1_CODE=...） */
+#ifndef GRANARY_KEY1_CODE
+#define GRANARY_KEY1_CODE KEY_1
+#endif
+#ifndef GRANARY_KEY2_CODE
+#define GRANARY_KEY2_CODE KEY_2
+#endif
+#ifndef GRANARY_KEY3_CODE
+#define GRANARY_KEY3_CODE KEY_3
+#endif
 
 #define KEY_MAX_EVENTS 32
 #define KEY_STABLE_DEVICE_PATH "/dev/input/by-path/platform-keys-event"

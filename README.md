@@ -161,11 +161,11 @@ ssh root@10.90.193.197 'mkdir -p /root/project/snapshots'
 ```bash
 cd /root/project
 export GRANARY_AUTO_START=1        # 无实体按键时自动进入巡检
-export MULTIMODAL_API_KEY="ark-..." # 方舟 API Key（切勿写进代码）
+# export MULTIMODAL_API_KEY="ark-..." # 可选：覆盖内置默认密钥（内置密钥见 app/multimodal.c）
 ./smart_granary_detect_system
 ```
 
-浏览器打开 `http://10.90.193.197:8080/`（IP 以 `ip a` 为准）。
+浏览器打开 `http://10.90.193.197:8081/`（IP 以 `ip a` 为准）。
 
 ---
 
@@ -197,7 +197,7 @@ export MULTIMODAL_API_KEY="ark-..." # 方舟 API Key（切勿写进代码）
 
 | 变量 | 默认值 | 说明 |
 |---|---|---|
-| `GRANARY_HTTP_PORT` | 8080 | HTTP 服务端口 |
+| `GRANARY_HTTP_PORT` | 8081 | HTTP 服务端口 |
 | `GRANARY_SNAPSHOT_DIR` | `./snapshots` | 快照根目录 |
 | `GRANARY_SNAPSHOT_KEEP_DAYS` | 7 | 快照保留天数（0=不清理） |
 | `GRANARY_KEY2_SAVE` | 0 | KEY2 是否额外保存 JPG |
@@ -206,7 +206,7 @@ export MULTIMODAL_API_KEY="ark-..." # 方舟 API Key（切勿写进代码）
 | `GRANARY_LOG_FILE` | - | 日志文件（默认仅 stderr） |
 | `CAMERA_DEVICE` | 自动探测 | 摄像头节点（/dev/videoN） |
 | `MULTIMODAL_API_BASE` | `https://ark.cn-beijing.volces.com/api/v3` | 方舟 Responses API 地址 |
-| `MULTIMODAL_API_KEY` | - | 方舟 API Key（**必填**，缺失走 stub） |
+| `MULTIMODAL_API_KEY` | 内置默认（见 `app/multimodal.c`） | 方舟 API Key；设置则覆盖内置默认，留空亦可用内置密钥 |
 | `MULTIMODAL_MODEL` | `doubao-seed-2-1-lite-260915` | 模型名 |
 | `MULTIMODAL_PROMPT` | - | 覆盖内置巡检提示词 |
 
@@ -236,8 +236,8 @@ export MULTIMODAL_API_KEY="ark-..." # 方舟 API Key（切勿写进代码）
 示例：
 
 ```bash
-curl http://10.90.193.197:8080/status.json
-curl "http://10.90.193.197:8080/control?action=toggle"   # 暂停/恢复巡检
+curl http://10.90.193.197:8081/status.json
+curl "http://10.90.193.197:8081/control?action=toggle"   # 暂停/恢复巡检
 ```
 
 KEY1 暂停时：停止周期采集、传感器轮询、告警待机、推流同步暂停。
@@ -373,7 +373,7 @@ snapshots/              告警 JPG（运行时创建，已 gitignore）
 能。所有硬件缺失均优雅降级：无摄像头时推流与 AI 等待画面；无按键时用 `GRANARY_AUTO_START=1` 自动进入巡检；传感器读取失败显示 `ERR` 并屏蔽对应告警。
 
 **Q：AI 一直显示 stub analysis？**
-未链接 libcurl 或未设置 `MULTIMODAL_API_KEY`。安装 `libcurl4-openssl-dev` 重新编译，并配置密钥。密钥只从环境变量读取，不会写入程序和仓库。
+未链接 libcurl（表现为 `built without libcurl`），或内置默认密钥被编译置空且未设置 `MULTIMODAL_API_KEY`。安装 `libcurl4-openssl-dev` 重新编译即可；密钥默认已内置在 `app/multimodal.c`（可用环境变量或 `-DMULTIMODAL_API_KEY_DEFAULT=` 覆盖）。注意：内置密钥的源码切勿提交到公开仓库。
 
 **Q：推流卡顿？**
 调小 `GRANARY_CAMERA_PERIOD_MS`（如 100）提高帧率；确认摄像头支持 MJPEG（YUYV 转码消耗 CPU）。
