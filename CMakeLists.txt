@@ -8,13 +8,20 @@ project(smart_granary_detect_system VERSION 1.0.0 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
-set(CMAKE_C_EXTENSIONS OFF)
+set(CMAKE_C_EXTENSIONS ON)
 
 find_package(Threads REQUIRED)
+find_package(CURL)
 
 add_executable(smart_granary_detect_system
     main.c
     app/app.c
+    app/state.c
+    app/alarm.c
+    app/display.c
+    app/snapshot.c
+    app/multimodal.c
+    app/http_server.c
     driver/LED.c
     driver/buzzer.c
     driver/delay.c
@@ -24,6 +31,9 @@ add_executable(smart_granary_detect_system
     driver/light_sensor.c
     driver/my_timer.c
     driver/voltage_sensor.c
+    driver/pir_sensor.c
+    driver/flame_sensor.c
+    driver/camera.c
 )
 
 target_include_directories(smart_granary_detect_system PRIVATE
@@ -34,7 +44,6 @@ target_include_directories(smart_granary_detect_system PRIVATE
 target_compile_options(smart_granary_detect_system PRIVATE
     -Wall
     -Wextra
-    -Wpedantic
 )
 
 target_link_libraries(smart_granary_detect_system PRIVATE
@@ -42,3 +51,23 @@ target_link_libraries(smart_granary_detect_system PRIVATE
     m
     rt
 )
+
+if(CURL_FOUND)
+    target_compile_definitions(smart_granary_detect_system PRIVATE HAVE_LIBCURL=1)
+    target_include_directories(smart_granary_detect_system PRIVATE ${CURL_INCLUDE_DIRS})
+    target_link_libraries(smart_granary_detect_system PRIVATE CURL::libcurl)
+    message(STATUS "libcurl found: multimodal HTTP API enabled")
+else()
+    message(STATUS "libcurl NOT found: multimodal API will use stub analysis")
+endif()
+
+# Optional board-specific GPIO paths, e.g.:
+# cmake -DPIR_SENSOR_SYSFS_PATH=\"/sys/class/gpio/gpio115/value\" ..
+if(DEFINED PIR_SENSOR_SYSFS_PATH)
+    target_compile_definitions(smart_granary_detect_system PRIVATE
+        PIR_SENSOR_SYSFS_PATH="${PIR_SENSOR_SYSFS_PATH}")
+endif()
+if(DEFINED FLAME_SENSOR_SYSFS_PATH)
+    target_compile_definitions(smart_granary_detect_system PRIVATE
+        FLAME_SENSOR_SYSFS_PATH="${FLAME_SENSOR_SYSFS_PATH}")
+endif()

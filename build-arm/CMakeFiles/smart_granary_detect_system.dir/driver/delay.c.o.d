@@ -1,0 +1,33 @@
+CMakeFiles/smart_granary_detect_system.dir/driver/delay.c.o: \
+ /root/smart-granary-detect-system/driver/delay.c \
+ /usr/arm-linux-gnueabihf/include/stdc-predef.h \
+ /root/smart-granary-detect-system/driver/delay.h \
+ /usr/arm-linux-gnueabihf/include/errno.h \
+ /usr/arm-linux-gnueabihf/include/features.h \
+ /usr/arm-linux-gnueabihf/include/features-time64.h \
+ /usr/arm-linux-gnueabihf/include/bits/wordsize.h \
+ /usr/arm-linux-gnueabihf/include/bits/timesize.h \
+ /usr/arm-linux-gnueabihf/include/sys/cdefs.h \
+ /usr/arm-linux-gnueabihf/include/bits/long-double.h \
+ /usr/arm-linux-gnueabihf/include/gnu/stubs.h \
+ /usr/arm-linux-gnueabihf/include/gnu/stubs-hard.h \
+ /usr/arm-linux-gnueabihf/include/bits/errno.h \
+ /usr/arm-linux-gnueabihf/include/linux/errno.h \
+ /usr/arm-linux-gnueabihf/include/asm/errno.h \
+ /usr/arm-linux-gnueabihf/include/asm-generic/errno.h \
+ /usr/arm-linux-gnueabihf/include/asm-generic/errno-base.h \
+ /usr/arm-linux-gnueabihf/include/time.h \
+ /usr/lib/gcc-cross/arm-linux-gnueabihf/13/include/stddef.h \
+ /usr/arm-linux-gnueabihf/include/bits/time.h \
+ /usr/arm-linux-gnueabihf/include/bits/types.h \
+ /usr/arm-linux-gnueabihf/include/bits/typesizes.h \
+ /usr/arm-linux-gnueabihf/include/bits/time64.h \
+ /usr/arm-linux-gnueabihf/include/bits/types/clock_t.h \
+ /usr/arm-linux-gnueabihf/include/bits/types/time_t.h \
+ /usr/arm-linux-gnueabihf/include/bits/types/struct_tm.h \
+ /usr/arm-linux-gnueabihf/include/bits/types/struct_timespec.h \
+ /usr/arm-linux-gnueabihf/include/bits/endian.h \
+ /usr/arm-linux-gnueabihf/include/bits/endianness.h \
+ /usr/arm-linux-gnueabihf/include/bits/types/clockid_t.h \
+ /usr/arm-linux-gnueabihf/include/bits/types/timer_t.h \
+ /usr/arm-linux-gnueabihf/include/bits/types/struct_itimerspec.h
