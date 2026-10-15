@@ -42,9 +42,12 @@ enum {
 #define CAMERA_RETRY_MS 2000U
 #endif
 
-/* 看门狗：线程心跳超过该秒数未更新视为卡死 */
+/*
+ * 看门狗：线程心跳超过该秒数未更新视为卡死。
+ * 默认 90s：需覆盖多模态 API 的 60s 请求超时（AI 线程在调用期间不更新心跳）。
+ */
 #ifndef WATCHDOG_STALL_S
-#define WATCHDOG_STALL_S 30
+#define WATCHDOG_STALL_S 90
 #endif
 #ifndef WATCHDOG_PERIOD_MS
 #define WATCHDOG_PERIOD_MS 5000U

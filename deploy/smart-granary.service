@@ -23,10 +23,10 @@ Environment=GRANARY_SNAPSHOT_KEEP_DAYS=7
 # 日志（可选）：GRANARY_LOG_FILE=/var/log/smart-granary.log
 # 日志级别：debug / info / warn / error
 Environment=GRANARY_LOG_LEVEL=info
-# 多模态大模型（二选一：此处配置 或 使用 EnvironmentFile）
-#Environment=MULTIMODAL_API_BASE=https://api.openai.com/v1
-#Environment=MULTIMODAL_API_KEY=sk-...
-#Environment=MULTIMODAL_MODEL=gpt-4o-mini
+# 多模态大模型（火山方舟 Responses API）
+#Environment=MULTIMODAL_API_BASE=https://ark.cn-beijing.volces.com/api/v3
+#Environment=MULTIMODAL_API_KEY=ark-...
+#Environment=MULTIMODAL_MODEL=doubao-seed-2-1-lite-260915
 # 推荐：密钥放独立文件（chmod 600），避免写入仓库
 #EnvironmentFile=/root/project/granary.env
 

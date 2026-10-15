@@ -132,6 +132,31 @@ static void config_load(granary_config_t *cfg)
                      "./snapshots");
         }
     }
+    /*
+     * 多模态（火山方舟 Responses API）：
+     * 默认 BASE 与模型名均为方舟 doubao 系列，可用环境变量覆盖。
+     */
+    {
+        const char *base = getenv("MULTIMODAL_API_BASE");
+        if (base != NULL && base[0] != '\0') {
+            snprintf(cfg->multimodal_api_base,
+                     sizeof(cfg->multimodal_api_base), "%s", base);
+        } else {
+            snprintf(cfg->multimodal_api_base,
+                     sizeof(cfg->multimodal_api_base),
+                     "https://ark.cn-beijing.volces.com/api/v3");
+        }
+    }
+    {
+        const char *model = getenv("MULTIMODAL_MODEL");
+        if (model != NULL && model[0] != '\0') {
+            snprintf(cfg->multimodal_model, sizeof(cfg->multimodal_model),
+                     "%s", model);
+        } else {
+            snprintf(cfg->multimodal_model, sizeof(cfg->multimodal_model),
+                     "doubao-seed-2-1-lite-260915");
+        }
+    }
     /* 多模态提示词：留空表示使用 multimodal.c 内置默认提示词 */
     {
         const char *prompt = getenv("MULTIMODAL_PROMPT");

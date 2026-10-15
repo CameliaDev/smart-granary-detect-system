@@ -40,7 +40,9 @@ typedef struct {
     char snapshot_dir[256];         /* GRANARY_SNAPSHOT_DIR (默认 ./snapshots) */
     int snapshot_keep_days;         /* GRANARY_SNAPSHOT_KEEP_DAYS (默认 7, 0=不清理) */
     int key2_save_snapshot;         /* GRANARY_KEY2_SAVE (默认 0; PDF 定义 KEY2 仅抓拍分析) */
-    /* 多模态 */
+    /* 多模态（火山方舟 Responses API） */
+    char multimodal_api_base[256]; /* MULTIMODAL_API_BASE，默认 https://ark.cn-beijing.volces.com/api/v3 */
+    char multimodal_model[64];     /* MULTIMODAL_MODEL，默认 doubao-seed-2-1-lite-260915 */
     char multimodal_prompt[512];    /* MULTIMODAL_PROMPT (默认内置巡检提示词) */
 } granary_config_t;
 

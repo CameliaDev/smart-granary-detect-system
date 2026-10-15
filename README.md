@@ -12,7 +12,7 @@
   - E04 粮情异常：霉变结块 / 粮面塌陷 / 虫害堆积 / 杂物遗留
   - E05 明火隐患
 - KEY1 启停巡检；KEY2 手动抓拍并即时多模态分析（默认不落盘，`GRANARY_KEY2_SAVE=1` 时保存）；KEY3 蜂鸣器静音
-- V4L2 摄像头周期采集、Base64、多模态 HTTP API（可选 libcurl）
+- V4L2 摄像头周期采集、Base64、火山方舟 **Responses API** 多模态识别（`doubao-seed-2-1-lite-260915`，流式 SSE，可选 libcurl）
 - 局域网 MJPEG/HTTP 网页推流，叠加数据/告警，支持告警历史与快照画廊
 - 告警自动保存 JPG 到 `./snapshots/YYYY-MM-DD/`（失败则 `/tmp/granary-snapshots`），按保留天数自动清理
 - 传感器读取失败时对应项显示 `ERR`，不影响其他功能
@@ -27,7 +27,7 @@ app/
   app.c/.h       线程编排、按键分发、传感器轮询、AI/抓拍触发、看门狗
   state.c/.h     全局状态 + 运行期配置（环境变量）+ 告警历史 + 线程心跳
   alarm.c/.h     告警判定（E01~E05）与执行机构控制
-  multimodal.c/.h  Base64 + OpenAI 兼容 API + 关键词解析（中英文）
+  multimodal.c/.h  Base64 + 火山方舟 Responses API（流式 SSE）+ 关键词解析（中英文）
   http_server.c/.h MJPEG 推流 + 状态 JSON + 快照浏览 + 控制端点
   snapshot.c/.h  JPG 落盘（按日期分目录）与保留策略清理
   display.c/.h   stdout 显示（LCD 替代）+ framebuffer stub
@@ -98,10 +98,10 @@ cd /root/project   # 或你的部署目录
 # 可选：无实体按键时自动进入巡检
 # export GRANARY_AUTO_START=1
 
-# 多模态 API（切勿把密钥写进代码）
-export MULTIMODAL_API_BASE="https://api.openai.com/v1"   # 或兼容网关
-export MULTIMODAL_API_KEY="sk-..."
-export MULTIMODAL_MODEL="gpt-4o-mini"
+# 多模态 API（火山方舟 Responses API，切勿把密钥写进代码）
+export MULTIMODAL_API_KEY="ark-..."                        # 必填：方舟 API Key
+export MULTIMODAL_API_BASE="https://ark.cn-beijing.volces.com/api/v3"   # 默认即此值
+export MULTIMODAL_MODEL="doubao-seed-2-1-lite-260915"      # 默认即此值
 # export MULTIMODAL_PROMPT="自定义巡检提示词..."
 
 ./smart_granary_detect_system
@@ -140,7 +140,10 @@ KEY1 暂停时：停止周期采集、传感器轮询、告警待机、推流暂
 | `GRANARY_LOG_LEVEL` | info | 日志级别 debug/info/warn/error |
 | `GRANARY_LOG_FILE` | - | 日志文件（默认仅 stderr） |
 | `CAMERA_DEVICE` | 自动探测 | 摄像头节点（/dev/videoN） |
-| `MULTIMODAL_API_BASE` / `MULTIMODAL_API_KEY` / `MULTIMODAL_MODEL` / `MULTIMODAL_PROMPT` | - | 多模态 API 配置 |
+| `MULTIMODAL_API_BASE` | `https://ark.cn-beijing.volces.com/api/v3` | 方舟 Responses API 地址（请求发往 `{BASE}/responses`） |
+| `MULTIMODAL_API_KEY` | - | 方舟 API Key（必填，缺失时走 stub 分析） |
+| `MULTIMODAL_MODEL` | `doubao-seed-2-1-lite-260915` | 模型名 |
+| `MULTIMODAL_PROMPT` | - | 覆盖内置巡检提示词 |
 
 编译期可覆盖项：`-DGRANARY_KEY1_CODE=...`（按键码）、`-DPIR_SENSOR_SYSFS_PATH=...`、
 `-DFLAME_SENSOR_SYSFS_PATH=...`、`-DPIR_ACTIVE_LOW=1`、`-DFLAME_ACTIVE_LOW=0`。
