@@ -1,0 +1,41 @@
+[Unit]
+Description=Smart Granary Detect System (FS-MP1A)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# 按实际部署目录修改
+WorkingDirectory=/root/project
+ExecStart=/root/project/smart_granary_detect_system
+# 进程退出（含看门狗主动退出）后自动重启
+Restart=always
+RestartSec=3
+
+# ---- 运行期配置（按需修改；切勿把密钥提交到仓库）----
+# 无实体按键时自动进入巡检
+Environment=GRANARY_AUTO_START=1
+# HTTP 服务端口
+Environment=GRANARY_HTTP_PORT=8080
+# 快照存储与保留天数
+Environment=GRANARY_SNAPSHOT_DIR=/root/project/snapshots
+Environment=GRANARY_SNAPSHOT_KEEP_DAYS=7
+# 日志（可选）：GRANARY_LOG_FILE=/var/log/smart-granary.log
+# 日志级别：debug / info / warn / error
+Environment=GRANARY_LOG_LEVEL=info
+# 多模态大模型（二选一：此处配置 或 使用 EnvironmentFile）
+#Environment=MULTIMODAL_API_BASE=https://api.openai.com/v1
+#Environment=MULTIMODAL_API_KEY=sk-...
+#Environment=MULTIMODAL_MODEL=gpt-4o-mini
+# 推荐：密钥放独立文件（chmod 600），避免写入仓库
+#EnvironmentFile=/root/project/granary.env
+
+# 摄像头/传感器设备访问权限（如以 root 运行可删除）
+#SupplementaryGroups=video input
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=smart-granary
+
+[Install]
+WantedBy=multi-user.target

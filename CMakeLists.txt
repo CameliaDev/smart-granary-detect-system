@@ -19,6 +19,7 @@ add_executable(smart_granary_detect_system
     app/state.c
     app/alarm.c
     app/display.c
+    app/log.c
     app/snapshot.c
     app/multimodal.c
     app/http_server.c
@@ -29,12 +30,14 @@ add_executable(smart_granary_detect_system
     driver/ht_sensor.c
     driver/key.c
     driver/light_sensor.c
-    driver/my_timer.c
     driver/voltage_sensor.c
     driver/pir_sensor.c
     driver/flame_sensor.c
     driver/camera.c
 )
+
+# 说明：driver/my_timer.c 当前未被使用（线程节拍由各线程 delay 完成），
+# 不参与编译；文件保留供后续需要 POSIX 定时器时启用。
 
 target_include_directories(smart_granary_detect_system PRIVATE
     app
