@@ -60,10 +60,11 @@ static const char k_b64[] =
 
 /* 内置默认巡检提示词（MULTIMODAL_PROMPT 可覆盖） */
 static const char k_default_prompt[] =
-    "You are a granary safety inspector. Describe the scene briefly. "
-    "If you see illegal human intrusion, grain mold/clumping, surface "
-    "collapse, pests, leftover debris, or open flame/smoke, say so "
-    "clearly using keywords: intrusion, mold, collapse, pest, debris, fire.";
+    "You are a granary safety inspector. 请始终用简体中文回答，"
+    "简要描述监控画面内容。画面正常时仅回答：画面正常，未发现粮仓安全隐患。"
+    "仅当确实看到以下情况时才明确指出，并在描述中包含对应关键词："
+    "人员闯入（闯入）、粮食霉变结块（霉变）、粮面塌陷（塌陷）、"
+    "虫害（虫害）、杂物遗留（杂物）、明火烟雾（明火）。";
 
 /* 流式累积文本上限（防止异常响应耗尽内存；超出部分丢弃） */
 #define AI_TEXT_ACCUM_MAX (64 * 1024)

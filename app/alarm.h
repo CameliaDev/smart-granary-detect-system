@@ -10,7 +10,7 @@
 #define VOLTAGE_SAFE_MAX_V 5.2f
 #endif
 #ifndef TEMP_SAFE_MAX_C
-#define TEMP_SAFE_MAX_C 30.0f
+#define TEMP_SAFE_MAX_C 40.0f
 #endif
 #ifndef HUMIDITY_SAFE_MAX_RH
 #define HUMIDITY_SAFE_MAX_RH 65.0f
