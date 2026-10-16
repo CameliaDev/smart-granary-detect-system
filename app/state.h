@@ -23,7 +23,7 @@ typedef struct {
     /* 告警阈值 */
     float voltage_min_v;          /* GRANARY_VOLTAGE_MIN  (默认 4.8)  */
     float voltage_max_v;          /* GRANARY_VOLTAGE_MAX  (默认 5.2)  */
-    float temp_max_c;             /* GRANARY_TEMP_MAX     (默认 30)   */
+    float temp_max_c;             /* GRANARY_TEMP_MAX     (默认 40)   */
     float rh_max_rh;              /* GRANARY_RH_MAX       (默认 65)   */
     /* 执行机构参数 */
     unsigned int fan_alarm_pwm;   /* GRANARY_FAN_PWM      (默认 200)  */
