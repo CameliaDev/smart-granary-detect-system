@@ -1,0 +1,38 @@
+name: build
+
+on:
+  push:
+    branches: [main, jiangnan]
+  pull_request:
+
+jobs:
+  build-with-curl:
+    name: Build (with libcurl) + smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake gcc libcurl4-openssl-dev
+      - name: Configure
+        run: cmake -S . -B build
+      - name: Build
+        run: cmake --build build -j
+      - name: Smoke test
+        run: bash tests/smoke.sh
+
+  build-without-curl:
+    name: Build (no libcurl, stub fallback)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake gcc
+      - name: Configure without libcurl
+        # 禁用 find_package(CURL)，验证 stub 降级路径可编译
+        run: cmake -S . -B build-nocurl -DCMAKE_DISABLE_FIND_PACKAGE_CURL=ON
+      - name: Build
+        run: cmake --build build-nocurl -j

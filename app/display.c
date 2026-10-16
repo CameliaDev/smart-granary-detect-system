@@ -1,36 +1,41 @@
+/*
+ * display.c —— 终端显示（LCD 替代方案）
+ *
+ * 将传感器实时数据、AI 识别结果与告警状态打印到 stdout，
+ * 同时这些数据也通过 HTTP /status.json 叠加到局域网网页画面。
+ * 传感器读取失败时对应项显示 ERR（见 state.h 的 *_valid 标志）。
+ */
+
 #include "display.h"
 
 #include <stdio.h>
 
+/** Print sensor + AI + alarms to stdout (LCD substitute). */
 void display_refresh(const app_state_t *st)
 {
-    if (st == NULL) {
-        return;
-    }
-    printf("\n======== Granary Monitor ========\n");
-    printf("Mode: %s | Mute: %s\n",
-           st->inspection_running ? "RUNNING" : "PAUSED",
-           st->buzzer_muted ? "yes" : "no");
-    printf("U=%.2f V  I=%.2f A  P=%.2f W  (ADC=%.2f V)\n",
-           st->supply_voltage_v, st->current_a, st->power_w,
+    printf("\033[2J\033[H");   /* 清屏，模拟 LCD 整屏刷新 */
+    printf("======== 智能粮仓检测系统 ========\n");
+    printf("巡检状态 : %s\n", st->inspection_running ? "运行中" : "已暂停");
+    printf("供电电压 : %.2f V (ADC %.2f V, x2)\n", st->supply_voltage_v,
            st->adc_voltage_v);
-    printf("T=%.1f C  RH=%.1f %%  Lux=%.0f\n", st->temperature_c,
-           st->humidity_rh, st->illuminance);
-    printf("PIR=%s  Flame=%s\n",
-           st->pir_detected ? "YES" : "no",
-           st->flame_detected ? "YES" : "no");
-    printf("Alarms: E01=%d E02=%d E03=%d E04=%d E05=%d\n", st->e01, st->e02,
-           st->e03, st->e04, st->e05);
-    if (st->alarm_text[0] != '\0') {
-        printf("Alarm: %s\n", st->alarm_text);
-    }
-    printf("AI: %s\n", st->ai_text);
-    printf("=================================\n");
-    fflush(stdout);
+    printf("负载电流 : %.2f A\n", st->current_a);
+    printf("实时功率 : %.2f W (P=U*I)\n", st->power_w);
+    printf("仓内温度 : %s%.1f ℃\n", st->temp_valid ? "" : "ERR ",
+           st->temperature_c);
+    printf("仓内湿度 : %s%.1f %%RH\n", st->hum_valid ? "" : "ERR ",
+           st->humidity_rh);
+    printf("光照强度 : %s%.0f lux\n", st->lux_valid ? "" : "ERR ",
+           st->illuminance);
+    printf("人体红外 : %s\n", st->pir_detected ? "有人闯入!" : "无人");
+    printf("火焰传感 : %s\n", st->flame_detected ? "检测到明火!" : "正常");
+    printf("AI 识别  : %s\n", st->ai_text);
+    printf("告警状态 : %s\n", st->alarm_text);
+    printf("快照数量 : %llu\n", (unsigned long long)st->snapshot_count);
 }
 
+/** Optional framebuffer stub — currently no-op if FB unavailable. */
 void display_framebuffer_stub(const app_state_t *st)
 {
+    /* TODO: 接入 framebuffer(/dev/fb0) 或 SPI LCD 驱动时在此实现 */
     (void)st;
-    /* No portable LCD path on all FS-MP1A images; web overlay is primary. */
 }

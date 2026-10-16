@@ -1,3 +1,22 @@
+/*
+ * alarm.c —— 告警判定与执行机构控制
+ *
+ * 判定规则（对照功能说明 PDF 4.3）：
+ *   E01 供电电压异常：U ∉ [cfg.voltage_min_v, cfg.voltage_max_v]
+ *   E02 温湿度超限  ：T > cfg.temp_max_c 或 RH > cfg.rh_max_rh
+ *   E03 人员闯入    ：人体红外传感器 或 AI 识别到人员
+ *   E04 粮情异常    ：AI 识别到 霉变结块/粮面塌陷/虫害堆积/杂物遗留
+ *   E05 明火隐患    ：火焰传感器 或 AI 识别到明火/烟雾
+ *
+ * 执行规则：
+ *   E01        → LED1 常亮 + 蜂鸣器低频间断（鸣/静各 400ms）
+ *   E02        → LED2 常亮 + 风扇通风（PWM 可配）
+ *   E03/E04/E05→ LED1~LED3 交替闪烁 + 蜂鸣器高频持续
+ *   巡检暂停    → 全部执行机构归位（待机）
+ *
+ * 阈值/频率/占空比均来自 st->cfg（环境变量可覆盖，见 state.c）。
+ */
+
 #include "alarm.h"
 
 #include "LED.h"
@@ -5,8 +24,39 @@
 #include "fan.h"
 
 #include <limits.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+
+/*
+ * 安全追加格式化文本。
+ * 修复原实现 "n += snprintf(...)" 累加返回值在超长时导致
+ * size_t 下溢（sizeof(text) - n 变成巨大值）的缓冲区溢出风险：
+ * 本函数保证返回值 n 始终钳位在 [0, size-1]。
+ */
+static size_t appendf(char *buf, size_t size, size_t n, const char *fmt, ...)
+{
+    va_list ap;
+    int written;
+
+    if (buf == NULL || size == 0) {
+        return 0;
+    }
+    if (n >= size - 1) {
+        return size - 1;
+    }
+    va_start(ap, fmt);
+    written = vsnprintf(buf + n, size - n, fmt, ap);
+    va_end(ap);
+    if (written < 0) {
+        return n;
+    }
+    n += (size_t)written;
+    if (n >= size) {
+        n = size - 1;
+    }
+    return n;
+}
 
 void alarm_evaluate(app_state_t *st)
 {
@@ -27,38 +77,42 @@ void alarm_evaluate(app_state_t *st)
     overlay[0] = '\0';
 
     if (st->sensors_valid) {
-        if (st->supply_voltage_v < VOLTAGE_SAFE_MIN_V ||
-            st->supply_voltage_v > VOLTAGE_SAFE_MAX_V) {
+        if (st->supply_voltage_v < st->cfg.voltage_min_v ||
+            st->supply_voltage_v > st->cfg.voltage_max_v) {
             st->e01 = 1;
-            n += (size_t)snprintf(text + n, sizeof(text) - n,
-                                  "E01 supply fault U=%.2fV; ",
-                                  st->supply_voltage_v);
+            n = appendf(text, sizeof(text), n, "E01 supply fault U=%.2fV; ",
+                        st->supply_voltage_v);
         }
-        if (st->temperature_c > TEMP_SAFE_MAX_C ||
-            st->humidity_rh > HUMIDITY_SAFE_MAX_RH) {
+        if (st->temperature_c > st->cfg.temp_max_c ||
+            st->humidity_rh > st->cfg.rh_max_rh) {
             st->e02 = 1;
-            n += (size_t)snprintf(text + n, sizeof(text) - n,
-                                  "E02 climate T=%.1fC RH=%.1f%%; ",
-                                  st->temperature_c, st->humidity_rh);
+            n = appendf(text, sizeof(text), n, "E02 climate T=%.1fC RH=%.1f%%; ",
+                        st->temperature_c, st->humidity_rh);
         }
     }
 
     if (st->pir_detected || st->ai_intrusion) {
         st->e03 = 1;
-        n += (size_t)snprintf(text + n, sizeof(text) - n, "E03 intrusion; ");
+        n = appendf(text, sizeof(text), n, "E03 intrusion; ");
     }
-    if (st->ai_mold) {
+    /* E04 粮情异常：霉变结块 / 粮面塌陷 / 虫害堆积 / 杂物遗留 */
+    if (st->ai_mold || st->ai_collapse || st->ai_pest || st->ai_debris) {
         st->e04 = 1;
-        n += (size_t)snprintf(text + n, sizeof(text) - n, "E04 mold; ");
+        n = appendf(text, sizeof(text), n, "E04 grain anomaly; ");
     }
-    if (st->flame_detected || st->ai_collapse || st->ai_fire) {
+    /* E05 明火隐患：火焰传感器 或 AI 识别明火/烟雾 */
+    if (st->flame_detected || st->ai_fire) {
         st->e05 = 1;
-        n += (size_t)snprintf(
-            text + n, sizeof(text) - n, "E05 collapse/fire; ");
+        n = appendf(text, sizeof(text), n, "E05 fire; ");
     }
 
     if (n == 0) {
         snprintf(text, sizeof(text), "OK");
+    }
+
+    /* 告警文本发生变化时记录一条历史（含恢复为 OK） */
+    if (strcmp(text, st->alarm_text) != 0) {
+        state_push_alarm_history_locked(text);
     }
 
     {
@@ -98,6 +152,7 @@ void alarm_apply_actuators(app_state_t *st, unsigned int tick_ms)
         return;
     }
 
+    /* 巡检暂停：全部执行机构待机 */
     if (!st->inspection_running) {
         if (last_led1 != 0) {
             ledcontrol(LED_DEVICE_ID_1, LED_OFF);
@@ -130,32 +185,32 @@ void alarm_apply_actuators(app_state_t *st, unsigned int tick_ms)
 
     if (severe) {
         leds_blink = 1;
-        /* Alternate LED1-3 */
+        /* LED1~LED3 交替闪烁：每个相位轮流点亮一颗 */
         led1 = (phase % 3 == 0);
         led2 = (phase % 3 == 1);
         led3 = (phase % 3 == 2);
         if (!st->buzzer_muted) {
-            buzz_hz = BUZZER_HIGH_FREQ_HZ;
+            buzz_hz = st->cfg.buzzer_high_hz;
         }
     } else {
         if (st->e01) {
             led1 = 1;
             if (!st->buzzer_muted) {
-                /* Low-freq intermittent: 400ms on / 400ms off */
+                /* 低频间断鸣响：400ms 鸣叫 / 400ms 静音 */
                 if ((tick_ms / 400U) % 2U == 0U) {
-                    buzz_hz = BUZZER_LOW_FREQ_HZ;
+                    buzz_hz = st->cfg.buzzer_low_hz;
                 }
             }
         }
         if (st->e02) {
             led2 = 1;
-            fan_pwm = (int)FAN_ALARM_PWM;
+            fan_pwm = (int)st->cfg.fan_alarm_pwm;
         }
     }
 
-    /* E02 fan also allowed alongside severe if climate bad */
+    /* E02 风扇在高级别告警并存时同样保持通风 */
     if (st->e02 && fan_pwm == 0) {
-        fan_pwm = (int)FAN_ALARM_PWM;
+        fan_pwm = (int)st->cfg.fan_alarm_pwm;
     }
 
     if (led1 != last_led1) {

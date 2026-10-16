@@ -1,3 +1,0 @@
-/root/smart-granary-detect-system/build-arm/CMakeFiles/smart_granary_detect_system.dir
-/root/smart-granary-detect-system/build-arm/CMakeFiles/edit_cache.dir
-/root/smart-granary-detect-system/build-arm/CMakeFiles/rebuild_cache.dir

@@ -1,3 +1,16 @@
+/*
+ * main.c —— 程序入口：初始化应用并创建全部工作线程
+ *
+ * 线程清单（见 app.h 的 APP_THREAD_*）：
+ *   0 sensor  传感器轮询 + 告警判定 + 显示刷新
+ *   1 key     按键扫描（KEY1 启停 / KEY2 抓拍+AI / KEY3 静音）
+ *   2 camera  V4L2 采集 + 快照落盘 + AI 请求
+ *   3 alarm   执行机构控制（LED / 蜂鸣器 / 风扇）
+ *   4 ai      多模态大模型分析（条件变量唤醒）
+ *   5 http    局域网网页推流 + 状态 JSON
+ *   6 watchdog 线程看门狗（心跳超时则退出，交由 systemd 重启）
+ */
+
 #include "app.h"
 #include "http_server.h"
 
@@ -15,6 +28,7 @@ int main(void)
         app_alarm_thread,
         app_ai_thread,
         http_server_thread,
+        app_watchdog_thread,
     };
     size_t created_count = 0;
     size_t i;
