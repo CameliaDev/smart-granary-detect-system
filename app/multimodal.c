@@ -418,17 +418,45 @@ static size_t write_cb(char *ptr, size_t size, size_t nmemb, void *userdata)
 
 /* ---------- AI 结果解析 ---------- */
 
-static void apply_stub(app_state_t *st, const char *reason)
+/*
+ * 分析结果先在局部累积，最后一次性提交到 st（短暂加锁）。
+ * 网络请求全程不持有 st->lock，避免阻塞推流/状态查询等其余线程。
+ */
+typedef struct {
+    char text[STATE_AI_TEXT_MAX];
+    int intrusion;
+    int mold;
+    int collapse;
+    int pest;
+    int debris;
+    int fire;
+} ai_result_t;
+
+/* 提交结果到全局状态：本文件唯一触碰 st 共享字段的地方，短暂加锁 */
+static void commit_result(app_state_t *st, const ai_result_t *res)
 {
-    snprintf(st->ai_text, sizeof(st->ai_text),
-             "stub analysis (%s): no obvious anomaly", reason);
-    st->ai_intrusion = 0;
-    st->ai_mold = 0;
-    st->ai_collapse = 0;
-    st->ai_pest = 0;
-    st->ai_debris = 0;
-    st->ai_fire = 0;
+    pthread_mutex_lock(&st->lock);
+    snprintf(st->ai_text, sizeof(st->ai_text), "%s", res->text);
+    st->ai_intrusion = res->intrusion;
+    st->ai_mold = res->mold;
+    st->ai_collapse = res->collapse;
+    st->ai_pest = res->pest;
+    st->ai_debris = res->debris;
+    st->ai_fire = res->fire;
     st->ai_seq++;
+    pthread_mutex_unlock(&st->lock);
+}
+
+static void fill_stub(ai_result_t *res, const char *reason)
+{
+    snprintf(res->text, sizeof(res->text),
+             "stub analysis (%s): no obvious anomaly", reason);
+    res->intrusion = 0;
+    res->mold = 0;
+    res->collapse = 0;
+    res->pest = 0;
+    res->debris = 0;
+    res->fire = 0;
 }
 
 /*
@@ -437,7 +465,7 @@ static void apply_stub(app_state_t *st, const char *reason)
  *   intrusion → E03；mold/collapse/pest/debris → E04；fire → E05
  */
 MULTIMODAL_MAYBE_UNUSED
-static void parse_ai_flags(app_state_t *st, const char *text)
+static void parse_ai_flags(ai_result_t *res, const char *text)
 {
     char lower[STATE_AI_TEXT_MAX];
     size_t i;
@@ -450,31 +478,31 @@ static void parse_ai_flags(app_state_t *st, const char *text)
     }
     lower[i] = '\0';
 
-    st->ai_intrusion =
+    res->intrusion =
         strstr(lower, "intrusion") != NULL || strstr(lower, "person") != NULL ||
         strstr(lower, "human") != NULL || strstr(lower, "闯入") != NULL ||
         strstr(lower, "人员") != NULL;
-    st->ai_mold = strstr(lower, "mold") != NULL ||
-                  strstr(lower, "mildew") != NULL ||
-                  strstr(lower, "霉变") != NULL ||
-                  strstr(lower, "结块") != NULL;
-    st->ai_collapse = strstr(lower, "collapse") != NULL ||
-                      strstr(lower, "塌陷") != NULL ||
-                      strstr(lower, "sink") != NULL;
-    st->ai_pest = strstr(lower, "pest") != NULL ||
-                  strstr(lower, "insect") != NULL ||
-                  strstr(lower, "worm") != NULL ||
-                  strstr(lower, "虫害") != NULL ||
-                  strstr(lower, "虫子") != NULL;
-    st->ai_debris = strstr(lower, "debris") != NULL ||
-                    strstr(lower, "leftover") != NULL ||
-                    strstr(lower, "foreign") != NULL ||
-                    strstr(lower, "杂物") != NULL ||
-                    strstr(lower, "遗留") != NULL;
-    st->ai_fire = strstr(lower, "flame") != NULL ||
-                  strstr(lower, "fire") != NULL ||
-                  strstr(lower, "明火") != NULL ||
-                  strstr(lower, "烟雾") != NULL;
+    res->mold = strstr(lower, "mold") != NULL ||
+                strstr(lower, "mildew") != NULL ||
+                strstr(lower, "霉变") != NULL ||
+                strstr(lower, "结块") != NULL;
+    res->collapse = strstr(lower, "collapse") != NULL ||
+                    strstr(lower, "塌陷") != NULL ||
+                    strstr(lower, "sink") != NULL;
+    res->pest = strstr(lower, "pest") != NULL ||
+                strstr(lower, "insect") != NULL ||
+                strstr(lower, "worm") != NULL ||
+                strstr(lower, "虫害") != NULL ||
+                strstr(lower, "虫子") != NULL;
+    res->debris = strstr(lower, "debris") != NULL ||
+                  strstr(lower, "leftover") != NULL ||
+                  strstr(lower, "foreign") != NULL ||
+                  strstr(lower, "杂物") != NULL ||
+                  strstr(lower, "遗留") != NULL;
+    res->fire = strstr(lower, "flame") != NULL ||
+                strstr(lower, "fire") != NULL ||
+                strstr(lower, "明火") != NULL ||
+                strstr(lower, "烟雾") != NULL;
 }
 
 /* ---------- 主入口 ---------- */
@@ -486,11 +514,17 @@ int multimodal_analyze_jpeg(app_state_t *st, const unsigned char *jpeg,
     const char *prompt;
     char *prompt_esc;
     char *b64;
+    ai_result_t res;
 
     if (st == NULL || jpeg == NULL || jpeg_len == 0) {
         return -1;
     }
 
+    /*
+     * st->cfg 为启动期一次性加载的只读配置（state_init 后不再变化），
+     * 无锁读取安全。本函数从头到尾不持有 st->lock，
+     * 全部结果写入局部变量 res，最后 commit_result 短暂加锁提交。
+     */
     api_key = getenv("MULTIMODAL_API_KEY");
     /* 未设置环境变量时使用内置默认密钥（全局生效） */
     if (api_key == NULL || api_key[0] == '\0') {
@@ -501,14 +535,16 @@ int multimodal_analyze_jpeg(app_state_t *st, const unsigned char *jpeg,
                                                     : k_default_prompt;
     prompt_esc = json_escape(prompt);
     if (prompt_esc == NULL) {
-        apply_stub(st, "prompt escape failed");
+        fill_stub(&res, "prompt escape failed");
+        commit_result(st, &res);
         return -1;
     }
 
     b64 = base64_encode(jpeg, jpeg_len);
     if (b64 == NULL) {
         free(prompt_esc);
-        apply_stub(st, "base64 failed");
+        fill_stub(&res, "base64 failed");
+        commit_result(st, &res);
         return -1;
     }
 
@@ -516,13 +552,15 @@ int multimodal_analyze_jpeg(app_state_t *st, const unsigned char *jpeg,
     (void)api_key;
     free(b64);
     free(prompt_esc);
-    apply_stub(st, "built without libcurl");
+    fill_stub(&res, "built without libcurl");
+    commit_result(st, &res);
     return 0;
 #else
     if (api_key == NULL || api_key[0] == '\0') {
         free(b64);
         free(prompt_esc);
-        apply_stub(st, "no API key configured");
+        fill_stub(&res, "no API key configured");
+        commit_result(st, &res);
         return 0;
     }
 
@@ -546,7 +584,8 @@ int multimodal_analyze_jpeg(app_state_t *st, const unsigned char *jpeg,
         if (payload == NULL) {
             free(b64);
             free(prompt_esc);
-            apply_stub(st, "oom");
+            fill_stub(&res, "oom");
+            commit_result(st, &res);
             return -1;
         }
 
@@ -576,7 +615,8 @@ int multimodal_analyze_jpeg(app_state_t *st, const unsigned char *jpeg,
         curl = curl_easy_init();
         if (curl == NULL) {
             free(payload);
-            apply_stub(st, "curl init failed");
+            fill_stub(&res, "curl init failed");
+            commit_result(st, &res);
             return -1;
         }
 
@@ -600,7 +640,8 @@ int multimodal_analyze_jpeg(app_state_t *st, const unsigned char *jpeg,
         if (rc != CURLE_OK || response.data == NULL) {
             log_error("multimodal: curl error %s", curl_easy_strerror(rc));
             free(response.data);
-            apply_stub(st, "API request failed");
+            fill_stub(&res, "API request failed");
+            commit_result(st, &res);
             return -1;
         }
 
@@ -620,22 +661,20 @@ int multimodal_analyze_jpeg(app_state_t *st, const unsigned char *jpeg,
         }
 
         if (text.len == 0) {
-            snprintf(st->ai_text, sizeof(st->ai_text),
-                     "API response parse failed");
-            parse_ai_flags(st, response.data);
+            snprintf(res.text, sizeof(res.text), "API response parse failed");
+            parse_ai_flags(&res, response.data);
             log_warn("multimodal: no text delta in response (%zu bytes)",
                      response.len);
         } else {
-            snprintf(st->ai_text, sizeof(st->ai_text), "%s", text.data);
-            parse_ai_flags(st, text.data);
-            log_info("multimodal: analysis done (seq=%llu, text=%zu bytes)",
-                     (unsigned long long)st->ai_seq + 1, text.len);
+            snprintf(res.text, sizeof(res.text), "%s", text.data);
+            parse_ai_flags(&res, text.data);
+            log_info("multimodal: analysis done (text=%zu bytes)", text.len);
         }
-        st->ai_seq++;
 
         free(text.data);
         free(response.data);
     }
+    commit_result(st, &res);
     return 0;
 #endif
 }
