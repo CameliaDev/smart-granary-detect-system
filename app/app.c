@@ -502,8 +502,18 @@ void *app_ai_thread(void *argument)
             continue;
         }
 
-        pthread_mutex_lock(&st->lock);
+        /*
+         * 关键修复：multimodal_analyze_jpeg 内部是阻塞式 HTTPS 请求
+         * （curl 超时最长 60s），绝不能在持有 st->lock 时调用。
+         * 之前在锁内调用，导致 AI 请求期间 /stream 推流、/status.json
+         * 轮询、HTTP accept（state_heartbeat 也要拿同一把锁）全部
+         * 阻塞——网页表现为"有视频推流时卡死"。而周期性 AI 请求只有
+         * 摄像头采集成功后才会触发，所以没摄像头时一切正常。
+         * 现在网络请求阶段不加锁，结果由 multimodal 内部短暂加锁提交。
+         */
         multimodal_analyze_jpeg(st, jpeg, jpeg_len);
+
+        pthread_mutex_lock(&st->lock);
         alarm_evaluate(st);
         pthread_mutex_unlock(&st->lock);
         free(jpeg);
